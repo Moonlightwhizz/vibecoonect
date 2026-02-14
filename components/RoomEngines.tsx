@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Zap, Brain, Headphones, Trash2, MousePointer2, Wind } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, Brain, Headphones, Trash2, MousePointer2, Wind, Search, Target } from 'lucide-react';
 
 export const ZenGarden = React.memo(() => {
   const [aura, setAura] = useState(0);
@@ -25,6 +25,81 @@ export const ZenGarden = React.memo(() => {
         Synchronize Breath
       </button>
       <div className="text-[10px] font-black uppercase tracking-[0.3em] text-green-500/50">{status}</div>
+    </div>
+  );
+});
+
+export const IntrovertGames = React.memo(() => {
+  const [game, setGame] = useState<'match' | 'seek'>('match');
+  const [score, setScore] = useState(0);
+  const [items, setItems] = useState<string[]>([]);
+  const [flipped, setFlipped] = useState<number[]>([]);
+  const emojis = ['🌙', '🍃', '✨', '💎', '🎨', '🌊'];
+
+  useEffect(() => {
+    if (game === 'match') {
+      const deck = [...emojis, ...emojis].sort(() => Math.random() - 0.5);
+      setItems(deck);
+      setFlipped([]);
+    }
+  }, [game]);
+
+  const handleFlip = (idx: number) => {
+    if (flipped.length === 2 || flipped.includes(idx)) return;
+    const newFlipped = [...flipped, idx];
+    setFlipped(newFlipped);
+
+    if (newFlipped.length === 2) {
+      if (items[newFlipped[0]] === items[newFlipped[1]]) {
+        setScore(s => s + 1);
+        setTimeout(() => setFlipped([]), 1000);
+      } else {
+        setTimeout(() => setFlipped([]), 1000);
+      }
+    }
+  };
+
+  return (
+    <div className="h-full w-full flex flex-col p-6 animate-fadeIn">
+      <div className="flex items-center justify-between mb-8">
+        <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+          <Target className="text-green-400" size={20} />
+          Quiet Focus
+        </h3>
+        <div className="flex gap-2">
+           <button onClick={() => setGame('match')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all ${game === 'match' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-500'}`}>Pairs</button>
+           <button onClick={() => setGame('seek')} className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all ${game === 'seek' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-500'}`}>Seeker</button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center">
+        {game === 'match' ? (
+          <div className="grid grid-cols-4 gap-3">
+            {items.map((item, i) => (
+              <button 
+                key={i} 
+                onClick={() => handleFlip(i)}
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all duration-500 ${flipped.includes(i) ? 'bg-green-500/20 rotate-0' : 'bg-white/5 rotate-y-180 border border-white/10'}`}
+              >
+                {flipped.includes(i) ? item : '?'}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center space-y-6">
+            <div className="w-24 h-24 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center animate-pulse">
+               <Search className="text-green-400 w-10 h-10" />
+            </div>
+            <p className="text-sm text-gray-400 italic">Find the hidden aura in the static...</p>
+            <button className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/10">Scan Frequency</button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-8 flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-gray-500">
+        <span>Score: {score}</span>
+        <span>Mode: Low Pulse</span>
+      </div>
     </div>
   );
 });

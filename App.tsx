@@ -1,17 +1,85 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, X, MessageSquare, ShieldCheck, Heart } from 'lucide-react';
 import { AppView, UserProfile, PersonalityResult, Room, Match, Message, OnlineUser } from './types';
-import { VIRTUAL_ROOMS, PERSONALITY_QUESTIONS } from './constants';
+import { VIRTUAL_ROOMS } from './constants';
 import WelcomeScreen from './components/WelcomeScreen';
 import PersonalityQuiz from './components/PersonalityQuiz';
 import LobbyView from './components/LobbyView';
 import ChatRoomView from './components/ChatRoomView';
 import MatchesView from './components/MatchesView';
+import Logo from './components/Logo';
 import { analyzePersonality, generateMockMatches, createRoomChat, createMatchChat } from './services/geminiService';
+import { socialService } from './services/socialService';
 
-const MOCK_NAMES = ["Stellar_99", "Echo_Mind", "Nova_Seeker", "Pixel_Witch", "Cyber_Zen", "Void_Walker", "Neon_Soul", "Aura_Hunter"];
-const AVATARS = ["🛸", "🌌", "👾", "🌙", "🌊", "🔥", "💎", "🧿"];
+const STORAGE_KEY_USER = 'vibeconnect_user_profile';
+const STORAGE_KEY_RESULT = 'vibeconnect_personality_result';
+
+const ProfileModal: React.FC<{ user: OnlineUser, onClose: () => void, onChat: (match: Match) => void }> = ({ user, onClose, onChat }) => {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="glass-card w-full max-w-lg rounded-[3rem] overflow-hidden relative shadow-2xl border-white/20">
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors z-10">
+          <X size={20} />
+        </button>
+        
+        <div className="h-32 w-full relative overflow-hidden">
+          <div className="absolute inset-0 opacity-50 blur-xl" style={{ backgroundColor: user.auraColor || '#6366f1' }}></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent"></div>
+        </div>
+
+        <div className="px-10 pb-10 -mt-16 relative">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-24 h-24 rounded-[2rem] flex items-center justify-center text-5xl shadow-2xl mb-4 border-4 border-slate-950 relative" style={{ backgroundColor: user.auraColor || '#6366f1' }}>
+              {user.avatar}
+              <div className="absolute bottom-1 right-1 w-6 h-6 bg-green-500 rounded-full border-4 border-slate-950"></div>
+            </div>
+            
+            <h2 className="text-3xl font-black flex items-center gap-2">
+              {user.name}, {user.age}
+              <ShieldCheck className="text-blue-400 w-5 h-5" />
+            </h2>
+            <p className="text-indigo-400 font-bold uppercase tracking-widest text-xs mt-1">{user.personalityType || 'New Soul'}</p>
+            
+            <div className="mt-6 p-6 rounded-2xl bg-white/5 border border-white/10 w-full text-left">
+              <p className="text-gray-300 italic leading-relaxed">"{user.bio || 'Synchronizing with the collective pulse.'}"</p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2 mt-6">
+              {user.interests?.map((int, i) => (
+                <span key={i} className="px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                  #{int}
+                </span>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => {
+                onChat({
+                  id: user.id,
+                  name: user.name,
+                  age: parseInt(user.age || '18'),
+                  type: user.personalityType || 'Synchronized Soul',
+                  interests: user.interests || [],
+                  vibeMatch: 100,
+                  online: true,
+                  avatar: user.avatar,
+                  isRealUser: true,
+                  auraColor: user.auraColor
+                });
+                onClose();
+              }}
+              className="w-full mt-8 py-5 rounded-2xl bg-gradient-to-r from-indigo-600 to-pink-600 font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-indigo-500/20"
+            >
+              <MessageSquare size={18} />
+              Open Connection
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.WELCOME);
@@ -19,36 +87,58 @@ const App: React.FC = () => {
   const [personalityResult, setPersonalityResult] = useState<PersonalityResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
-  // Chat & Social State
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState<OnlineUser | null>(null);
   const activeChatSession = useRef<any>(null);
 
   const [matches, setMatches] = useState<Match[]>([]);
 
-  // Initialize and simulate online users
+  // Persistent Login
   useEffect(() => {
-    const initialUsers: OnlineUser[] = MOCK_NAMES.map((name, i) => ({
-      name,
-      avatar: AVATARS[i],
-      status: (['online', 'away', 'busy'] as const)[Math.floor(Math.random() * 3)]
-    }));
-    setOnlineUsers(initialUsers);
+    const savedUser = localStorage.getItem(STORAGE_KEY_USER);
+    const savedResult = localStorage.getItem(STORAGE_KEY_RESULT);
 
-    const interval = setInterval(() => {
-      setOnlineUsers(prev => prev.map(u => ({
-        ...u,
-        status: Math.random() > 0.8 ? (['online', 'away', 'busy'] as const)[Math.floor(Math.random() * 3)] : u.status
-      })));
-    }, 8000);
-
-    return () => clearInterval(interval);
+    if (savedUser && savedResult) {
+      const user = JSON.parse(savedUser);
+      const result = JSON.parse(savedResult);
+      setUserProfile(user);
+      setPersonalityResult(result);
+      setMatches(generateMockMatches(result));
+      setCurrentView(AppView.LOBBY);
+      
+      socialService.init(
+        { 
+          id: user.id, 
+          name: user.name, 
+          avatar: "😊", 
+          status: 'online', 
+          lastSeen: Date.now(),
+          age: user.age,
+          bio: user.bio,
+          interests: user.interests,
+          auraColor: user.auraColor,
+          personalityType: result.personalityType
+        },
+        handleRemoteMessage,
+        setOnlineUsers
+      );
+    }
   }, []);
 
-  const handleStartAnalysis = (profile: UserProfile) => {
-    setUserProfile(profile);
+  const handleRemoteMessage = (msg: Message) => {
+    // If it's a message from another user in the same chat room/private session, add it
+    setChatMessages(prev => {
+      if (prev.some(m => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+  };
+
+  const handleStartAnalysis = (profile: Omit<UserProfile, 'id'>) => {
+    const profileWithId: UserProfile = { ...profile, id: Math.random().toString(36).substr(2, 9) };
+    setUserProfile(profileWithId);
     setCurrentView(AppView.PERSONALITY);
   };
 
@@ -61,6 +151,27 @@ const App: React.FC = () => {
       const result = await analyzePersonality(userProfile, answers);
       setPersonalityResult(result);
       setMatches(generateMockMatches(result));
+      
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userProfile));
+      localStorage.setItem(STORAGE_KEY_RESULT, JSON.stringify(result));
+      
+      socialService.init(
+        { 
+          id: userProfile.id, 
+          name: userProfile.name, 
+          avatar: "😊", 
+          status: 'online', 
+          lastSeen: Date.now(),
+          age: userProfile.age,
+          bio: userProfile.bio,
+          interests: userProfile.interests,
+          auraColor: userProfile.auraColor,
+          personalityType: result.personalityType
+        },
+        handleRemoteMessage,
+        setOnlineUsers
+      );
+
       setIsAnalyzing(false);
       setCurrentView(AppView.LOBBY);
     } catch (error: any) {
@@ -75,78 +186,133 @@ const App: React.FC = () => {
     if (!userProfile) return;
     setActiveRoom(room);
     setActiveMatch(null);
-    setChatMessages([{ id: 1, user: "System", avatar: "🤖", message: `Connecting to ${room.name} energy...`, time: "Now" }]);
+    setChatMessages([]); // Clear chat for fresh entrance
+    
+    socialService.updateRoom(room.id);
     activeChatSession.current = createRoomChat(room, { ...userProfile, ...personalityResult });
     setCurrentView(AppView.CHAT);
+
+    // Initial Host Greeting
+    setTimeout(() => {
+        handleSendMessage("Connecting... Hello!", true);
+    }, 1000);
   };
 
   const startPrivateChat = (match: Match) => {
     if (!userProfile) return;
     setActiveMatch(match);
     setActiveRoom(null);
-    setChatMessages([{ id: 1, user: "System", avatar: "🔐", message: `Secure vibe-encrypted channel opened with ${match.name}.`, time: "Now" }]);
-    activeChatSession.current = createMatchChat(match, { ...userProfile, ...personalityResult });
+    setChatMessages([]);
+    
+    socialService.updateRoom(null);
+    
+    if (match.isRealUser) {
+      activeChatSession.current = null;
+    } else {
+      activeChatSession.current = createMatchChat(match, { ...userProfile, ...personalityResult });
+    }
     setCurrentView(AppView.PRIVATE_CHAT);
   };
 
-  const handleSendMessage = async (text: string) => {
-    if (!text.trim() || !userProfile || !activeChatSession.current) return;
+  const handleSendMessage = async (text: string, isAutoInitial: boolean = false) => {
+    if (!text.trim() || !userProfile) return;
 
-    const userMsg: Message = {
-      id: Date.now(),
-      user: userProfile.name,
-      avatar: "😊",
-      message: text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isYou: true
-    };
-    setChatMessages(prev => [...prev, userMsg]);
+    const isPeerChat = activeMatch?.isRealUser;
+    const recipientId = activeMatch?.id?.toString();
+    const roomId = activeRoom?.id;
 
-    const aiId = Date.now() + 1;
-    const aiAvatar = activeMatch ? activeMatch.avatar : "🤖";
-    const aiName = activeMatch ? activeMatch.name : `${activeRoom?.name} Host`;
-    
-    const streamingMsg: Message = {
-      id: aiId,
-      user: aiName,
-      avatar: aiAvatar,
-      message: "",
-      time: "Typing...",
-      isStreaming: true
-    };
-    setChatMessages(prev => [...prev, streamingMsg]);
+    if (!isAutoInitial) {
+        const msgId = Math.random().toString(36).substr(2, 9);
+        const userMsg: Message = {
+          id: msgId,
+          userId: userProfile.id,
+          user: userProfile.name,
+          avatar: "😊",
+          message: text,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isYou: true,
+          type: 'chat',
+          recipientId: isPeerChat ? recipientId : undefined,
+          roomId: roomId || undefined
+        };
 
-    try {
-      let fullResponse = "";
-      const stream = await activeChatSession.current.sendMessageStream({ message: text });
+        setChatMessages(prev => [...prev, userMsg]);
+        socialService.sendMessage(userMsg);
+    }
+
+    if (!isPeerChat && activeChatSession.current) {
+      const aiId = 'ai-' + Date.now();
+      const aiAvatar = activeMatch ? activeMatch.avatar : "🤖";
+      const aiName = activeMatch ? activeMatch.name : `${activeRoom?.name} Host`;
       
-      for await (const chunk of stream) {
-        const chunkText = chunk.text;
-        fullResponse += chunkText;
+      const streamingMsg: Message = {
+        id: aiId,
+        userId: 'ai-host',
+        user: aiName,
+        avatar: aiAvatar,
+        message: "",
+        time: "Synthesizing...",
+        isStreaming: true,
+        type: 'ai',
+        recipientId: undefined,
+        roomId: roomId || undefined
+      };
+      setChatMessages(prev => [...prev, streamingMsg]);
+
+      try {
+        let fullResponse = "";
+        const stream = await activeChatSession.current.sendMessageStream({ message: text });
+        
+        for await (const chunk of stream) {
+          const chunkText = chunk.text;
+          // IMPORTANT: Check if chunk.text is incremental or cumulative
+          // In most @google/genai streaming contexts, it is incremental.
+          // But if it's repeating, it might be cumulative in the user's environment.
+          if (chunkText.startsWith(fullResponse)) {
+             fullResponse = chunkText;
+          } else {
+             fullResponse += chunkText;
+          }
+          
+          setChatMessages(prev => prev.map(m => 
+            m.id === aiId ? { ...m, message: fullResponse, time: "Just now" } : m
+          ));
+        }
+
+        setChatMessages(prev => prev.map(m => m.id === aiId ? { ...m, isStreaming: false } : m));
+      } catch (error) {
         setChatMessages(prev => prev.map(m => 
-          m.id === aiId ? { ...m, message: fullResponse, time: "Just now" } : m
+          m.id === aiId ? { ...m, message: "Aura disruption detected. Reconnecting...", isStreaming: false } : m
         ));
       }
-
-      setChatMessages(prev => prev.map(m => 
-        m.id === aiId ? { ...m, isStreaming: false } : m
-      ));
-    } catch (error) {
-      console.error("Chat Error:", error);
-      setChatMessages(prev => prev.map(m => 
-        m.id === aiId ? { ...m, message: "My connection flickered. Can you repeat that?", isStreaming: false } : m
-      ));
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_RESULT);
+    window.location.reload();
+  };
+
   return (
-    <div className="min-h-screen relative flex flex-col items-center">
+    <div className="min-h-screen relative flex flex-col items-center overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-[10%] left-[5%] w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl animate-float"></div>
         <div className="absolute bottom-[20%] right-[10%] w-96 h-96 rounded-full bg-pink-500/10 blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
       </div>
 
-      <main className="relative z-10 w-full max-w-6xl px-4 py-8 flex-1 flex flex-col">
+      <nav className="relative z-20 w-full max-w-6xl px-6 py-4 flex items-center justify-between">
+        <Logo onClick={() => setCurrentView(AppView.LOBBY)} />
+        {userProfile && currentView !== AppView.WELCOME && (
+          <div className="flex items-center gap-3 md:gap-6">
+            <button onClick={() => setCurrentView(AppView.LOBBY)} className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors">Lobby</button>
+            <button onClick={() => setCurrentView(AppView.MATCHES)} className="text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors">Tribes</button>
+            <button onClick={handleLogout} className="text-[10px] md:text-xs font-black uppercase tracking-widest text-pink-500/50 hover:text-pink-500 transition-colors">Sign Out</button>
+          </div>
+        )}
+      </nav>
+
+      <main className="relative z-10 w-full max-w-6xl px-4 py-4 flex-1 flex flex-col min-h-0">
         {currentView === AppView.WELCOME && (
           <WelcomeScreen onStart={handleStartAnalysis} />
         )}
@@ -155,8 +321,12 @@ const App: React.FC = () => {
         )}
         {currentView === AppView.ANALYZING && (
           <div className="flex-1 flex flex-col items-center justify-center space-y-8">
-             <Sparkles className="w-20 h-20 text-indigo-400 animate-spin" />
-             <h2 className="text-4xl font-black animate-pulse text-center">Synchronizing Vibe Archetype...</h2>
+             <div className="relative">
+                <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse"></div>
+                <Sparkles className="w-20 h-20 text-indigo-400 animate-spin relative z-10" />
+             </div>
+             <h2 className="text-4xl font-black animate-pulse text-center tracking-tighter">Synchronizing Vibe Archetype...</h2>
+             <p className="text-gray-500 font-medium text-center max-w-sm">Mapping your digital aura to the collective neural frequency...</p>
           </div>
         )}
         {currentView === AppView.LOBBY && personalityResult && userProfile && (
@@ -168,27 +338,52 @@ const App: React.FC = () => {
             onJoinRoom={joinRoom}
             onViewMatches={() => setCurrentView(AppView.MATCHES)}
             onEditProfile={() => setCurrentView(AppView.WELCOME)}
+            onSelectUser={setSelectedUser}
           />
         )}
         {(currentView === AppView.CHAT || currentView === AppView.PRIVATE_CHAT) && (activeRoom || activeMatch) && (
           <ChatRoomView
-            room={activeRoom || ({ name: activeMatch?.name, theme: 'casual' } as Room)}
-            messages={chatMessages}
-            onlineUsers={onlineUsers.slice(0, activeRoom ? 4 : 1)} // Simulate specific room users
+            room={activeRoom || ({ id: -1, name: activeMatch?.name, theme: 'casual', description: "Private conversation started." } as Room)}
+            messages={chatMessages.filter(m => {
+              if (activeRoom) return m.roomId === activeRoom.id || m.type === 'system';
+              if (activeMatch) {
+                if (activeMatch.isRealUser) {
+                  return (m.userId === userProfile?.id && m.recipientId === activeMatch.id.toString()) ||
+                         (m.userId === activeMatch.id.toString() && m.recipientId === userProfile?.id) ||
+                         m.type === 'system';
+                }
+                return m.userId === 'ai-host' || m.isYou || m.type === 'system';
+              }
+              return false;
+            })}
+            onlineUsers={onlineUsers.filter(u => u.currentRoomId === activeRoom?.id)}
             onSendMessage={handleSendMessage}
-            onBack={() => setCurrentView(activeMatch ? AppView.MATCHES : AppView.LOBBY)}
+            onBack={() => {
+              socialService.updateRoom(null);
+              setCurrentView(activeMatch ? AppView.MATCHES : AppView.LOBBY);
+            }}
             userAvatar="😊"
+            isPeerChat={activeMatch?.isRealUser}
           />
         )}
         {currentView === AppView.MATCHES && (
           <MatchesView
             matches={matches}
+            onlineUsers={onlineUsers.filter(u => u.id !== userProfile?.id)}
             result={personalityResult!}
             onBack={() => setCurrentView(AppView.LOBBY)}
             onConnect={startPrivateChat}
           />
         )}
       </main>
+
+      {selectedUser && (
+        <ProfileModal 
+          user={selectedUser} 
+          onClose={() => setSelectedUser(null)} 
+          onChat={startPrivateChat}
+        />
+      )}
     </div>
   );
 };

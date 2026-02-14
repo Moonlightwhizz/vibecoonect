@@ -1,5 +1,6 @@
 
 export interface UserProfile {
+  id: string; // Unique session ID
   name: string;
   age: string;
   lookingFor: string[];
@@ -31,7 +32,7 @@ export interface Room {
 }
 
 export interface Match {
-  id: number;
+  id: string | number;
   name: string;
   age: number;
   type: string;
@@ -40,22 +41,37 @@ export interface Match {
   online: boolean;
   avatar: string;
   bio?: string;
+  isRealUser?: boolean;
+  auraColor?: string;
 }
 
 export interface Message {
-  id: number;
+  id: string;
+  userId: string;
   user: string;
   avatar: string;
   message: string;
   time: string;
   isYou?: boolean;
   isStreaming?: boolean;
+  type?: 'chat' | 'system' | 'ai';
+  recipientId?: string; // For private peer-to-peer messages
+  roomId?: number | null; // For room messages
 }
 
 export interface OnlineUser {
+  id: string;
   name: string;
   avatar: string;
   status: 'online' | 'away' | 'busy';
+  lastSeen: number;
+  currentRoomId?: number | null;
+  // Shared profile data for discovery
+  age?: string;
+  bio?: string;
+  interests?: string[];
+  auraColor?: string;
+  personalityType?: string;
 }
 
 export enum AppView {

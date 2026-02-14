@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Sparkles, Heart, Globe, Edit3, ShieldCheck, Users, Circle, Moon, MinusCircle } from 'lucide-react';
+import { Sparkles, Heart, Globe, Edit3, ShieldCheck, Users, Circle, Moon, MinusCircle, Eye } from 'lucide-react';
 import { UserProfile, PersonalityResult, Room, OnlineUser } from '../types';
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onJoinRoom: (room: Room) => void;
   onViewMatches: () => void;
   onEditProfile: () => void;
+  onSelectUser: (user: OnlineUser) => void;
 }
 
 const StatusBadge = ({ status, size = "sm" }: { status: OnlineUser['status'], size?: "sm" | "md" }) => {
@@ -29,7 +30,7 @@ const StatusBadge = ({ status, size = "sm" }: { status: OnlineUser['status'], si
   );
 };
 
-const LobbyView: React.FC<Props> = ({ profile, result, rooms, onlineUsers, onJoinRoom, onViewMatches, onEditProfile }) => {
+const LobbyView: React.FC<Props> = ({ profile, result, rooms, onlineUsers, onJoinRoom, onViewMatches, onEditProfile, onSelectUser }) => {
   return (
     <div className="w-full space-y-12 animate-fadeIn py-6">
       <header className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -97,7 +98,6 @@ const LobbyView: React.FC<Props> = ({ profile, result, rooms, onlineUsers, onJoi
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Experience Nodes */}
         <div className="lg:col-span-3 space-y-8">
           <div className="flex items-end justify-between mb-2">
             <h3 className="text-3xl font-black flex items-center gap-4 tracking-tight">
@@ -141,25 +141,40 @@ const LobbyView: React.FC<Props> = ({ profile, result, rooms, onlineUsers, onJoi
           </div>
         </div>
 
-        {/* Active Souls Sidebar */}
         <div className="space-y-6">
           <h3 className="text-xl font-black flex items-center gap-3 tracking-tight">
             <Users className="text-pink-400" />
-            Active Souls
+            Registered Souls
           </h3>
           <div className="glass-card rounded-[2rem] p-6 space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
-            {onlineUsers.map((user, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-3 group">
+            {onlineUsers.length === 0 ? (
+               <div className="text-center py-10">
+                 <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">No friends synced yet</p>
+               </div>
+            ) : onlineUsers.map((user, idx) => (
+              <div 
+                key={idx} 
+                onClick={() => user.id !== profile.id && onSelectUser(user)}
+                className={`flex items-center justify-between gap-3 group p-3 rounded-2xl hover:bg-white/5 transition-all cursor-pointer ${user.id === profile.id ? 'opacity-50 pointer-events-none' : ''}`}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-xl relative">
+                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-xl relative" style={{ boxShadow: user.auraColor ? `inset 0 0 10px ${user.auraColor}` : '' }}>
                     {user.avatar}
                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0f172a] ${
                       user.status === 'online' ? 'bg-green-500' : user.status === 'away' ? 'bg-amber-500' : 'bg-rose-500'
                     }`} />
                   </div>
-                  <div className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">{user.name}</div>
+                  <div>
+                    <div className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors flex items-center gap-1">
+                      {user.name}
+                      {user.id === profile.id && <span className="text-[8px] opacity-50">(You)</span>}
+                    </div>
+                    <div className="text-[9px] text-gray-600 font-black uppercase tracking-tight">{user.personalityType || 'Synchronizing...'}</div>
+                  </div>
                 </div>
-                <StatusBadge status={user.status} />
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Eye size={14} className="text-pink-500" />
+                </div>
               </div>
             ))}
           </div>
