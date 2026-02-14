@@ -22,29 +22,24 @@ const ProfileModal: React.FC<{ user: OnlineUser, onClose: () => void, onChat: (m
         <button onClick={onClose} className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors z-10">
           <X size={20} />
         </button>
-        
         <div className="h-32 w-full relative overflow-hidden">
           <div className="absolute inset-0 opacity-50 blur-xl" style={{ backgroundColor: user.auraColor || '#6366f1' }}></div>
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent"></div>
         </div>
-
         <div className="px-10 pb-10 -mt-16 relative">
           <div className="flex flex-col items-center text-center">
             <div className="w-24 h-24 rounded-[2rem] flex items-center justify-center text-5xl shadow-2xl mb-4 border-4 border-slate-950 relative" style={{ backgroundColor: user.auraColor || '#6366f1' }}>
               {user.avatar}
               <div className="absolute bottom-1 right-1 w-6 h-6 bg-green-500 rounded-full border-4 border-slate-950"></div>
             </div>
-            
             <h2 className="text-3xl font-black flex items-center gap-2">
               {user.name}, {user.age}
               <ShieldCheck className="text-blue-400 w-5 h-5" />
             </h2>
             <p className="text-indigo-400 font-bold uppercase tracking-widest text-xs mt-1">{user.personalityType || 'New Soul'}</p>
-            
             <div className="mt-6 p-6 rounded-2xl bg-white/5 border border-white/10 w-full text-left">
               <p className="text-gray-300 italic leading-relaxed">"{user.bio || 'Synchronizing with the collective pulse.'}"</p>
             </div>
-
             <div className="flex flex-wrap justify-center gap-2 mt-6">
               {user.interests?.map((int, i) => (
                 <span key={i} className="px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-black uppercase tracking-widest text-indigo-300">
@@ -52,7 +47,6 @@ const ProfileModal: React.FC<{ user: OnlineUser, onClose: () => void, onChat: (m
                 </span>
               ))}
             </div>
-
             <button 
               onClick={() => {
                 onChat({
@@ -86,21 +80,17 @@ const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [personalityResult, setPersonalityResult] = useState<PersonalityResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<OnlineUser | null>(null);
   const activeChatSession = useRef<any>(null);
-
   const [matches, setMatches] = useState<Match[]>([]);
 
-  // Persistent Login
   useEffect(() => {
     const savedUser = localStorage.getItem(STORAGE_KEY_USER);
     const savedResult = localStorage.getItem(STORAGE_KEY_RESULT);
-
     if (savedUser && savedResult) {
       const user = JSON.parse(savedUser);
       const result = JSON.parse(savedResult);
@@ -108,20 +98,8 @@ const App: React.FC = () => {
       setPersonalityResult(result);
       setMatches(generateMockMatches(result));
       setCurrentView(AppView.LOBBY);
-      
       socialService.init(
-        { 
-          id: user.id, 
-          name: user.name, 
-          avatar: "😊", 
-          status: 'online', 
-          lastSeen: Date.now(),
-          age: user.age,
-          bio: user.bio,
-          interests: user.interests,
-          auraColor: user.auraColor,
-          personalityType: result.personalityType
-        },
+        { id: user.id, name: user.name, avatar: "😊", status: 'online', lastSeen: Date.now(), age: user.age, bio: user.bio, interests: user.interests, auraColor: user.auraColor, personalityType: result.personalityType },
         handleRemoteMessage,
         setOnlineUsers
       );
@@ -129,11 +107,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleRemoteMessage = (msg: Message) => {
-    // If it's a message from another user in the same chat room/private session, add it
-    setChatMessages(prev => {
-      if (prev.some(m => m.id === msg.id)) return prev;
-      return [...prev, msg];
-    });
+    setChatMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
   };
 
   const handleStartAnalysis = (profile: Omit<UserProfile, 'id'>) => {
@@ -146,32 +120,17 @@ const App: React.FC = () => {
     if (!userProfile) return;
     setIsAnalyzing(true);
     setCurrentView(AppView.ANALYZING);
-    
     try {
       const result = await analyzePersonality(userProfile, answers);
       setPersonalityResult(result);
       setMatches(generateMockMatches(result));
-      
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userProfile));
       localStorage.setItem(STORAGE_KEY_RESULT, JSON.stringify(result));
-      
       socialService.init(
-        { 
-          id: userProfile.id, 
-          name: userProfile.name, 
-          avatar: "😊", 
-          status: 'online', 
-          lastSeen: Date.now(),
-          age: userProfile.age,
-          bio: userProfile.bio,
-          interests: userProfile.interests,
-          auraColor: userProfile.auraColor,
-          personalityType: result.personalityType
-        },
+        { id: userProfile.id, name: userProfile.name, avatar: "😊", status: 'online', lastSeen: Date.now(), age: userProfile.age, bio: userProfile.bio, interests: userProfile.interests, auraColor: userProfile.auraColor, personalityType: result.personalityType },
         handleRemoteMessage,
         setOnlineUsers
       );
-
       setIsAnalyzing(false);
       setCurrentView(AppView.LOBBY);
     } catch (error: any) {
@@ -186,16 +145,23 @@ const App: React.FC = () => {
     if (!userProfile) return;
     setActiveRoom(room);
     setActiveMatch(null);
-    setChatMessages([]); // Clear chat for fresh entrance
-    
+    setChatMessages([]);
     socialService.updateRoom(room.id);
     activeChatSession.current = createRoomChat(room, { ...userProfile, ...personalityResult });
     setCurrentView(AppView.CHAT);
-
-    // Initial Host Greeting
-    setTimeout(() => {
-        handleSendMessage("Connecting... Hello!", true);
-    }, 1000);
+    
+    // Welcome message is a system-like host greeting, does NOT trigger a loop
+    const greetingId = 'greet-' + Date.now();
+    setChatMessages([{
+      id: greetingId,
+      userId: 'ai-host',
+      user: `${room.name} Host`,
+      avatar: room.icon,
+      message: `Welcome, ${userProfile.name}! The energy here is perfect for a ${room.theme} session. What's on your mind?`,
+      time: "Just now",
+      type: 'ai',
+      roomId: room.id
+    }]);
   };
 
   const startPrivateChat = (match: Match) => {
@@ -203,86 +169,92 @@ const App: React.FC = () => {
     setActiveMatch(match);
     setActiveRoom(null);
     setChatMessages([]);
-    
     socialService.updateRoom(null);
-    
     if (match.isRealUser) {
       activeChatSession.current = null;
     } else {
       activeChatSession.current = createMatchChat(match, { ...userProfile, ...personalityResult });
+      setChatMessages([{
+        id: 'greet-' + Date.now(),
+        userId: 'ai-host',
+        user: match.name,
+        avatar: match.avatar,
+        message: `Hey ${userProfile.name}! I noticed our vibes are highly compatible. How's your journey going?`,
+        time: "Just now",
+        type: 'ai'
+      }]);
     }
     setCurrentView(AppView.PRIVATE_CHAT);
   };
 
-  const handleSendMessage = async (text: string, isAutoInitial: boolean = false) => {
-    if (!text.trim() || !userProfile) return;
+  const handleSendMessage = async (text: string) => {
+    const trimmedText = text.trim();
+    if (!trimmedText || !userProfile) return;
 
     const isPeerChat = activeMatch?.isRealUser;
-    const recipientId = activeMatch?.id?.toString();
-    const roomId = activeRoom?.id;
+    const msgId = Math.random().toString(36).substr(2, 9);
+    
+    // 1. Create and add user message
+    const userMsg: Message = {
+      id: msgId,
+      userId: userProfile.id,
+      user: userProfile.name,
+      avatar: "😊",
+      message: trimmedText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isYou: true,
+      type: 'chat',
+      recipientId: isPeerChat ? activeMatch?.id.toString() : undefined,
+      roomId: activeRoom?.id || undefined
+    };
+    
+    setChatMessages(prev => [...prev, userMsg]);
+    socialService.sendMessage(userMsg);
 
-    if (!isAutoInitial) {
-        const msgId = Math.random().toString(36).substr(2, 9);
-        const userMsg: Message = {
-          id: msgId,
-          userId: userProfile.id,
-          user: userProfile.name,
-          avatar: "😊",
-          message: text,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isYou: true,
-          type: 'chat',
-          recipientId: isPeerChat ? recipientId : undefined,
-          roomId: roomId || undefined
-        };
-
-        setChatMessages(prev => [...prev, userMsg]);
-        socialService.sendMessage(userMsg);
-    }
-
+    // 2. Trigger AI response if not a peer-to-peer chat
     if (!isPeerChat && activeChatSession.current) {
       const aiId = 'ai-' + Date.now();
-      const aiAvatar = activeMatch ? activeMatch.avatar : "🤖";
-      const aiName = activeMatch ? activeMatch.name : `${activeRoom?.name} Host`;
-      
       const streamingMsg: Message = {
         id: aiId,
         userId: 'ai-host',
-        user: aiName,
-        avatar: aiAvatar,
+        user: activeMatch ? activeMatch.name : `${activeRoom?.name} Host`,
+        avatar: activeMatch ? activeMatch.avatar : (activeRoom?.icon || "🤖"),
         message: "",
         time: "Synthesizing...",
         isStreaming: true,
         type: 'ai',
-        recipientId: undefined,
-        roomId: roomId || undefined
+        roomId: activeRoom?.id || undefined
       };
+      
       setChatMessages(prev => [...prev, streamingMsg]);
 
       try {
         let fullResponse = "";
-        const stream = await activeChatSession.current.sendMessageStream({ message: text });
+        const stream = await activeChatSession.current.sendMessageStream({ message: trimmedText });
         
         for await (const chunk of stream) {
           const chunkText = chunk.text;
-          // IMPORTANT: Check if chunk.text is incremental or cumulative
-          // In most @google/genai streaming contexts, it is incremental.
-          // But if it's repeating, it might be cumulative in the user's environment.
-          if (chunkText.startsWith(fullResponse)) {
-             fullResponse = chunkText;
-          } else {
-             fullResponse += chunkText;
+          
+          // ROBUST ACCUMULATION LOGIC:
+          // Handles both "cumulative" (Vercel/Stream) and "delta" (Local/Direct) chunks.
+          if (chunkText.startsWith(fullResponse) && chunkText.length > fullResponse.length) {
+            fullResponse = chunkText; // Replace if cumulative
+          } else if (!fullResponse.endsWith(chunkText)) {
+            fullResponse += chunkText; // Append if delta
           }
           
           setChatMessages(prev => prev.map(m => 
             m.id === aiId ? { ...m, message: fullResponse, time: "Just now" } : m
           ));
         }
-
-        setChatMessages(prev => prev.map(m => m.id === aiId ? { ...m, isStreaming: false } : m));
-      } catch (error) {
+        
         setChatMessages(prev => prev.map(m => 
-          m.id === aiId ? { ...m, message: "Aura disruption detected. Reconnecting...", isStreaming: false } : m
+          m.id === aiId ? { ...m, isStreaming: false } : m
+        ));
+      } catch (error) {
+        console.error("Chat Stream Error:", error);
+        setChatMessages(prev => prev.map(m => 
+          m.id === aiId ? { ...m, message: "Aura disruption detected. Please try refreshing.", isStreaming: false } : m
         ));
       }
     }
@@ -300,7 +272,6 @@ const App: React.FC = () => {
         <div className="absolute top-[10%] left-[5%] w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl animate-float"></div>
         <div className="absolute bottom-[20%] right-[10%] w-96 h-96 rounded-full bg-pink-500/10 blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
       </div>
-
       <nav className="relative z-20 w-full max-w-6xl px-6 py-4 flex items-center justify-between">
         <Logo onClick={() => setCurrentView(AppView.LOBBY)} />
         {userProfile && currentView !== AppView.WELCOME && (
@@ -311,79 +282,35 @@ const App: React.FC = () => {
           </div>
         )}
       </nav>
-
       <main className="relative z-10 w-full max-w-6xl px-4 py-4 flex-1 flex flex-col min-h-0">
-        {currentView === AppView.WELCOME && (
-          <WelcomeScreen onStart={handleStartAnalysis} />
-        )}
-        {currentView === AppView.PERSONALITY && (
-          <PersonalityQuiz onComplete={handleQuizComplete} />
-        )}
+        {currentView === AppView.WELCOME && <WelcomeScreen onStart={handleStartAnalysis} />}
+        {currentView === AppView.PERSONALITY && <PersonalityQuiz onComplete={handleQuizComplete} />}
         {currentView === AppView.ANALYZING && (
           <div className="flex-1 flex flex-col items-center justify-center space-y-8">
              <div className="relative">
                 <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse"></div>
                 <Sparkles className="w-20 h-20 text-indigo-400 animate-spin relative z-10" />
              </div>
-             <h2 className="text-4xl font-black animate-pulse text-center tracking-tighter">Synchronizing Vibe Archetype...</h2>
-             <p className="text-gray-500 font-medium text-center max-w-sm">Mapping your digital aura to the collective neural frequency...</p>
+             <h2 className="text-4xl font-black animate-pulse text-center tracking-tighter">Synthesizing Aura...</h2>
           </div>
         )}
         {currentView === AppView.LOBBY && personalityResult && userProfile && (
-          <LobbyView
-            profile={userProfile}
-            result={personalityResult}
-            rooms={VIRTUAL_ROOMS}
-            onlineUsers={onlineUsers}
-            onJoinRoom={joinRoom}
-            onViewMatches={() => setCurrentView(AppView.MATCHES)}
-            onEditProfile={() => setCurrentView(AppView.WELCOME)}
-            onSelectUser={setSelectedUser}
-          />
+          <LobbyView profile={userProfile} result={personalityResult} rooms={VIRTUAL_ROOMS} onlineUsers={onlineUsers} onJoinRoom={joinRoom} onViewMatches={() => setCurrentView(AppView.MATCHES)} onEditProfile={() => setCurrentView(AppView.WELCOME)} onSelectUser={setSelectedUser} />
         )}
         {(currentView === AppView.CHAT || currentView === AppView.PRIVATE_CHAT) && (activeRoom || activeMatch) && (
           <ChatRoomView
-            room={activeRoom || ({ id: -1, name: activeMatch?.name, theme: 'casual', description: "Private conversation started." } as Room)}
-            messages={chatMessages.filter(m => {
-              if (activeRoom) return m.roomId === activeRoom.id || m.type === 'system';
-              if (activeMatch) {
-                if (activeMatch.isRealUser) {
-                  return (m.userId === userProfile?.id && m.recipientId === activeMatch.id.toString()) ||
-                         (m.userId === activeMatch.id.toString() && m.recipientId === userProfile?.id) ||
-                         m.type === 'system';
-                }
-                return m.userId === 'ai-host' || m.isYou || m.type === 'system';
-              }
-              return false;
-            })}
+            room={activeRoom || ({ id: -1, name: activeMatch?.name, theme: 'casual' } as Room)}
+            messages={chatMessages}
             onlineUsers={onlineUsers.filter(u => u.currentRoomId === activeRoom?.id)}
             onSendMessage={handleSendMessage}
-            onBack={() => {
-              socialService.updateRoom(null);
-              setCurrentView(activeMatch ? AppView.MATCHES : AppView.LOBBY);
-            }}
+            onBack={() => { socialService.updateRoom(null); setCurrentView(activeMatch ? AppView.MATCHES : AppView.LOBBY); }}
             userAvatar="😊"
             isPeerChat={activeMatch?.isRealUser}
           />
         )}
-        {currentView === AppView.MATCHES && (
-          <MatchesView
-            matches={matches}
-            onlineUsers={onlineUsers.filter(u => u.id !== userProfile?.id)}
-            result={personalityResult!}
-            onBack={() => setCurrentView(AppView.LOBBY)}
-            onConnect={startPrivateChat}
-          />
-        )}
+        {currentView === AppView.MATCHES && <MatchesView matches={matches} onlineUsers={onlineUsers.filter(u => u.id !== userProfile?.id)} result={personalityResult!} onBack={() => setCurrentView(AppView.LOBBY)} onConnect={startPrivateChat} />}
       </main>
-
-      {selectedUser && (
-        <ProfileModal 
-          user={selectedUser} 
-          onClose={() => setSelectedUser(null)} 
-          onChat={startPrivateChat}
-        />
-      )}
+      {selectedUser && <ProfileModal user={selectedUser} onClose={() => setSelectedUser(null)} onChat={startPrivateChat} />}
     </div>
   );
 };

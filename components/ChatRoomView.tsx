@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
-import { Send, ArrowLeft, Loader2, Users, Circle, Moon, MinusCircle, Settings, Type, Eye, Sparkles, UserCheck, ChevronDown, ChevronUp } from 'lucide-react';
+// Added missing ShieldCheck and MessageSquare icons to the lucide-react import list.
+import { Send, ArrowLeft, Loader2, Users, Circle, Moon, MinusCircle, Settings, Type, Eye, Sparkles, UserCheck, ChevronDown, ChevronUp, ShieldCheck, MessageSquare } from 'lucide-react';
 import { Room, Message, OnlineUser } from '../types';
 import * as Engines from './RoomEngines';
 
